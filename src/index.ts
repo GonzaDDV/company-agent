@@ -1,4 +1,5 @@
 import { createBot } from './bot/telegram.js';
+import { startProactiveJobs } from './bot/proactive.js';
 
 async function main() {
   console.log('Starting company agent...');
@@ -17,6 +18,7 @@ async function main() {
   await bot.start({
     onStart: (botInfo) => {
       console.log(`Bot running as @${botInfo.username}`);
+      startProactiveJobs(bot);
     },
   });
 }

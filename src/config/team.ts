@@ -9,8 +9,7 @@ export interface TeamMember {
  * Each member needs their Telegram user ID (get it by messaging @userinfobot on Telegram).
  */
 export const TEAM: TeamMember[] = [
-  // { telegramId: '123456789', name: 'John', companies: ['thc', 'patagon'] },
-  // { telegramId: '987654321', name: 'Jane', companies: ['thc'] },
+  { telegramId: '5107171686', name: 'MRG', companies: ['thc', 'patagon'] },
 ];
 
 export function getTeamMember(telegramId: string): TeamMember | undefined {

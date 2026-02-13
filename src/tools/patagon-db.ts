@@ -1,7 +1,7 @@
-import type Anthropic from '@anthropic-ai/sdk';
+import type { ToolDefinition } from './types.js';
 import { patagonDb } from '../db/patagon-db.js';
 
-export const patagonDbToolDef: Anthropic.Tool = {
+export const patagonDbToolDef: ToolDefinition = {
   name: 'query_patagon_db',
   description: `Query the Patagon Markets database (read-only). Available tables and key columns:
 

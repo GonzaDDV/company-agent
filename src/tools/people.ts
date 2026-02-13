@@ -1,8 +1,9 @@
-import type Anthropic from '@anthropic-ai/sdk';
+import type { ToolDefinition } from './types.js';
 import type { AgentContext } from '../agent/core.js';
 import { agentDb } from '../db/agent-db.js';
+import { storeEmbeddingAsync, semanticSearch } from '../lib/embeddings.js';
 
-export const peopleToolDefs: Anthropic.Tool[] = [
+export const peopleToolDefs: ToolDefinition[] = [
   {
     name: 'store_person',
     description: 'Store information about an external contact or person.',
@@ -54,6 +55,17 @@ export const peopleToolDefs: Anthropic.Tool[] = [
       required: ['id'],
     },
   },
+  {
+    name: 'delete_person',
+    description: 'Permanently delete a contact from the people directory.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'The person ID to delete' },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 export async function executePeopleTool(
@@ -77,12 +89,42 @@ export async function executePeopleTool(
         .single();
 
       if (error) return `Error storing person: ${error.message}`;
-      return `Stored contact: ${data.name} (ID: ${data.id})`;
+
+      // Fire-and-forget: generate and store embedding for semantic search
+      const embeddingText = [
+        input.name as string,
+        (input.company as string) || '',
+        (input.role as string) || '',
+        (input.notes as string) || '',
+        ...(input.known_by ? (input.known_by as string[]).map((k) => `knows:${k}`) : []),
+        ...(input.tags ? (input.tags as string[]).map((t) => `#${t}`) : []),
+      ].filter(Boolean).join(' ');
+      storeEmbeddingAsync('people', data.id, embeddingText);
+
+      return `Stored contact: ${data.name}.`;
     }
 
     case 'search_people': {
       const q = input.query as string;
 
+      // Try semantic search first
+      const semanticResults = await semanticSearch('people', q, { limit: 10 });
+      if (semanticResults && semanticResults.length > 0) {
+        const sourceIds = semanticResults.map((r) => r.source_id);
+        const { data, error } = await agentDb
+          .from('people')
+          .select('*')
+          .in('id', sourceIds);
+
+        if (!error && data && data.length > 0) {
+          // Re-sort by similarity order from semantic search
+          const idOrder = new Map(sourceIds.map((id, i) => [id, i]));
+          data.sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
+          return JSON.stringify(data, null, 2);
+        }
+      }
+
+      // Fallback: ilike keyword search
       const { data, error } = await agentDb
         .from('people')
         .select('*')
@@ -108,7 +150,46 @@ export async function executePeopleTool(
         .eq('id', input.id as string);
 
       if (error) return `Error updating person: ${error.message}`;
+
+      // Re-embed with latest data if any searchable fields were updated
+      if (input.notes !== undefined || input.company !== undefined || input.role !== undefined) {
+        // Fetch the full record to build a complete embedding
+        const { data: person } = await agentDb
+          .from('people')
+          .select('name, company, role, notes, known_by, tags')
+          .eq('id', input.id as string)
+          .single();
+
+        if (person) {
+          const embeddingText = [
+            person.name,
+            person.company || '',
+            person.role || '',
+            person.notes || '',
+            ...(person.known_by || []).map((k: string) => `knows:${k}`),
+            ...(person.tags || []).map((t: string) => `#${t}`),
+          ].filter(Boolean).join(' ');
+          storeEmbeddingAsync('people', input.id as string, embeddingText);
+        }
+      }
+
       return 'Person updated.';
+    }
+
+    case 'delete_person': {
+      await agentDb
+        .from('embeddings')
+        .delete()
+        .eq('source_table', 'people')
+        .eq('source_id', input.id as string);
+
+      const { error } = await agentDb
+        .from('people')
+        .delete()
+        .eq('id', input.id as string);
+
+      if (error) return `Error deleting person: ${error.message}`;
+      return 'Person deleted.';
     }
 
     default:

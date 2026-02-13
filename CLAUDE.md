@@ -71,7 +71,7 @@ Required in `.env` (see `.env.example`):
 | Variable | Description |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | From @BotFather on Telegram |
-| `ANTHROPIC_API_KEY` | Claude API key |
+| `OPENROUTER_API_KEY` | OpenRouter API key (routes to best model via `openrouter/auto`) |
 | `AGENT_SUPABASE_URL` | Agent's own Supabase project URL |
 | `AGENT_SUPABASE_SERVICE_ROLE_KEY` | Agent DB service role key |
 | `PATAGON_SUPABASE_URL` | Patagon's Supabase project URL |
@@ -133,14 +133,14 @@ Migration file: `patagon-migrations/add_readonly_query.sql` — must be applied 
 
 - **Runtime:** Node.js with TypeScript (ESM)
 - **Bot framework:** grammY (Telegram Bot API)
-- **AI:** Claude API via `@anthropic-ai/sdk` (Sonnet for tool use)
+- **AI:** OpenRouter via `openai` SDK (`openrouter/auto` — routes to best model per request)
 - **Database:** Supabase (PostgreSQL)
 - **Linting:** Biome (same config as Patagon)
 - **Dev:** tsx for hot-reload
 
 ## Important Notes
 
-- **Model:** Uses `claude-sonnet-4-5-20250929` for the agent (fast + cost-effective for tool use). Can be upgraded to Opus for complex reasoning if needed.
+- **Model:** Uses `openrouter/auto` which automatically selects the best model per request (balances cost, speed, and capability). Routed via OpenRouter.
 - **Read-only Patagon access:** The agent can only SELECT from Patagon's DB. The `execute_readonly_query` function blocks all mutations.
 - **No web UI yet:** Phase 1 is Telegram-only. Web UI and Slack are future phases.
 - **Monday.com:** Integration is planned but requires the Monday.com board structure to be documented first.

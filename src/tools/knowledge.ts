@@ -1,8 +1,10 @@
-import type Anthropic from '@anthropic-ai/sdk';
+import type { ToolDefinition } from './types.js';
 import type { AgentContext } from '../agent/core.js';
 import { agentDb } from '../db/agent-db.js';
+import { storeEmbeddingAsync, semanticSearch } from '../lib/embeddings.js';
+import { summarizeNoteAsync } from '../lib/summarize.js';
 
-export const knowledgeToolDefs: Anthropic.Tool[] = [
+export const knowledgeToolDefs: ToolDefinition[] = [
   {
     name: 'store_note',
     description: `Store a note, idea, task, or any piece of information for the team.
@@ -61,6 +63,17 @@ Types: "note" (general), "task" (actionable), "idea" (explore later), "logistics
       required: ['id'],
     },
   },
+  {
+    name: 'delete_note',
+    description: 'Permanently delete a note, task, idea, or other knowledge item.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'The note ID to delete' },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 export async function executeKnowledgeTool(
@@ -84,10 +97,46 @@ export async function executeKnowledgeTool(
         .single();
 
       if (error) return `Error storing note: ${error.message}`;
-      return `Stored ${data.type} with ID: ${data.id}`;
+
+      // Fire-and-forget: generate and store embedding for semantic search
+      const embeddingText = [
+        input.content as string,
+        ...(input.tags ? (input.tags as string[]).map((t) => `#${t}`) : []),
+        input.type ? `type:${input.type}` : '',
+        input.company ? `company:${input.company}` : '',
+      ].filter(Boolean).join(' ');
+      storeEmbeddingAsync('notes', data.id, embeddingText);
+      summarizeNoteAsync(data.id, input.content as string);
+
+      return `Stored ${data.type}.`;
     }
 
     case 'search_notes': {
+      // Try semantic search first when a query is provided
+      if (input.query) {
+        const semanticResults = await semanticSearch('notes', input.query as string);
+        if (semanticResults && semanticResults.length > 0) {
+          const sourceIds = semanticResults.map((r) => r.source_id);
+          let query = agentDb
+            .from('notes')
+            .select('id, content, type, tags, company, status, author_name, created_at')
+            .in('id', sourceIds);
+
+          if (input.type) query = query.eq('type', input.type as string);
+          if (input.company) query = query.eq('company', input.company as string);
+          if (input.status) query = query.eq('status', input.status as string);
+
+          const { data, error } = await query;
+          if (!error && data && data.length > 0) {
+            // Re-sort by similarity order from semantic search
+            const idOrder = new Map(sourceIds.map((id, i) => [id, i]));
+            data.sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
+            return JSON.stringify(data, null, 2);
+          }
+        }
+      }
+
+      // Fallback: ilike keyword search
       let query = agentDb
         .from('notes')
         .select('id, content, type, tags, company, status, author_name, created_at');
@@ -116,7 +165,31 @@ export async function executeKnowledgeTool(
         .eq('id', input.id as string);
 
       if (error) return `Error updating note: ${error.message}`;
+
+      // Re-embed and re-summarize if content was updated
+      if (input.content) {
+        storeEmbeddingAsync('notes', input.id as string, input.content as string);
+        summarizeNoteAsync(input.id as string, input.content as string);
+      }
+
       return `Note updated.`;
+    }
+
+    case 'delete_note': {
+      // Delete embedding first (no cascade FK)
+      await agentDb
+        .from('embeddings')
+        .delete()
+        .eq('source_table', 'notes')
+        .eq('source_id', input.id as string);
+
+      const { error } = await agentDb
+        .from('notes')
+        .delete()
+        .eq('id', input.id as string);
+
+      if (error) return `Error deleting note: ${error.message}`;
+      return 'Note deleted.';
     }
 
     default:
