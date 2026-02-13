@@ -1,0 +1,11 @@
+name = "company-agent-email"
+main = "src/index.ts"
+compatibility_date = "2025-12-01"
+
+# Email routing triggers are configured in the Cloudflare dashboard,
+# not in this file. Route bot@patagonmarkets.com to this worker there.
+
+# Secrets (set via `wrangler secret put <NAME>`):
+# - AGENT_SUPABASE_URL
+# - AGENT_SUPABASE_SERVICE_ROLE_KEY
+# - OPENROUTER_API_KEY

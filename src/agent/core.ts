@@ -5,6 +5,7 @@ import { getToolsForUser, executeTool } from '../tools/index.js';
 import type { ToolDefinition } from '../tools/types.js';
 import { env } from '../config/env.js';
 import { agentDb } from '../db/agent-db.js';
+import { getModelConfig, selectModel } from './router.js';
 
 const openrouter = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
@@ -156,7 +157,7 @@ export async function chat(ctx: AgentContext, userMessage: string, imageUrl?: st
   }
 
   const tools = getToolsForUser(ctx.companies);
-  const response = await runAgentLoop(messages, tools, ctx);
+  const response = await runAgentLoop(messages, tools, ctx, !!imageUrl);
 
   messages.push({ role: 'assistant', content: response });
 
@@ -189,16 +190,21 @@ async function runAgentLoop(
   messages: ChatCompletionMessageParam[],
   tools: ToolDefinition[],
   ctx: AgentContext,
+  hasImage: boolean,
 ): Promise<string> {
   const openaiTools = toOpenAITools(tools);
+  const modelConfig = getModelConfig();
   let currentMessages: ChatCompletionMessageParam[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     ...messages,
   ];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const route = selectModel(modelConfig, round, hasImage);
+    console.log(`[router] round=${round} model=${route.model} tier=${route.tier} (${route.reason})`);
+
     const response = await openrouter.chat.completions.create({
-      model: 'openrouter/auto',
+      model: route.model,
       max_tokens: 4096,
       tools: openaiTools,
       messages: currentMessages,

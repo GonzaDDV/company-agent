@@ -10,6 +10,8 @@ const envSchema = z.object({
   PATAGON_SUPABASE_SERVICE_ROLE_KEY: z.string(),
   MONDAY_API_TOKEN: z.string().optional(),
   DIGEST_CHAT_ID: z.string().optional(),
+  MODEL_FAST: z.string().default('anthropic/claude-3.5-haiku'),
+  MODEL_SMART: z.string().default('anthropic/claude-sonnet-4'),
 });
 
 const parsed = envSchema.safeParse(process.env);
