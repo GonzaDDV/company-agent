@@ -12,20 +12,6 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/**
- * Truncate a string to a max length, adding ellipsis if needed.
- */
-function truncate(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return `${str.slice(0, maxLen - 1)}...`;
-}
-
-/**
- * Collapse a note/task/idea to a single line (no truncation).
- */
-function flattenText(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
-}
 
 /**
  * Send a message to the digest chat. Returns true if sent, false if skipped or failed.

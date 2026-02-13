@@ -5,6 +5,7 @@ import { knowledgeToolDefs, executeKnowledgeTool } from './knowledge.js';
 import { readingsToolDefs, executeReadingsTool } from './readings.js';
 import { peopleToolDefs, executePeopleTool } from './people.js';
 import { transcriptsToolDefs, executeTranscriptsTool } from './transcripts.js';
+import { mondayCrmToolDefs, executeMondayCrmTool } from './monday-crm.js';
 
 interface ToolEntry {
   definition: ToolDefinition;
@@ -41,6 +42,12 @@ const allTools: ToolEntry[] = [
     company: 'patagon',
     execute: (input: Record<string, unknown>) => executePatagonDb(input),
   },
+  ...mondayCrmToolDefs.map((def) => ({
+    definition: def,
+    company: 'patagon' as const,
+    execute: (input: Record<string, unknown>, ctx: AgentContext) =>
+      executeMondayCrmTool(def.name, input, ctx),
+  })),
 ];
 
 // Tool lookup by name for fast dispatch
