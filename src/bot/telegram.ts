@@ -120,12 +120,13 @@ export function createBot(): Bot {
       clearInterval(typingInterval);
 
       // Telegram has a 4096 char limit per message
+      const noPreview = { link_preview_options: { is_disabled: true } };
       if (response.length > 4000) {
         for (const chunk of splitMessage(response, 4000)) {
-          await ctx.reply(chunk);
+          await ctx.reply(chunk, noPreview);
         }
       } else {
-        await ctx.reply(response);
+        await ctx.reply(response, noPreview);
       }
     } catch (error) {
       clearInterval(typingInterval);
@@ -174,12 +175,13 @@ export function createBot(): Bot {
 
       clearInterval(typingInterval);
 
+      const noPreview = { link_preview_options: { is_disabled: true } };
       if (response.length > 4000) {
         for (const chunk of splitMessage(response, 4000)) {
-          await ctx.reply(chunk);
+          await ctx.reply(chunk, noPreview);
         }
       } else {
-        await ctx.reply(response);
+        await ctx.reply(response, noPreview);
       }
     } catch (error) {
       clearInterval(typingInterval);

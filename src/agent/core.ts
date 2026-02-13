@@ -228,7 +228,7 @@ async function runAgentLoop(
 
     // Execute all tool calls and add results
     for (const toolCall of message.tool_calls) {
-      const input = JSON.parse(toolCall.function.arguments);
+      const input = toolCall.function.arguments ? JSON.parse(toolCall.function.arguments) : {};
       const result = await executeTool(toolCall.function.name, input, ctx);
       currentMessages.push({
         role: 'tool',
